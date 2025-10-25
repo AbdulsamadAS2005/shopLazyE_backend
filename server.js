@@ -11,6 +11,10 @@ const Admins = new mongoose.Schema({
 
 const Admin = mongoose.model("Admins", Admins);
 
+app.get('/',(req,res)=>{
+    res.send("running")
+})
+
 app.get('/getLatest',async(req,res)=>{
     const latest=await Admin.find();
     if(latest){
