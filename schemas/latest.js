@@ -1,6 +1,7 @@
 const mongoose=require('mongoose')
 const Admins = new mongoose.Schema({
-  Latest:String
+  Latest:String,
+  CollectionToShowOnHome:String
 });
 
 const Admin = mongoose.model("Admins", Admins);

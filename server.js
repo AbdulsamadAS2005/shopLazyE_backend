@@ -8,17 +8,17 @@ const Admin = require('./schemas/latest.js')
 const Product = require('./schemas/products.js')
 
 app.get('/', (req, res) => {
-    res.send("running")
+  res.send("running!!!")
 })
 
 app.get('/getLatest', async (req, res) => {
-    const latest = await Admin.find();
-    if (latest) {
-        res.status(201).json(latest)
-    }
-    else {
-        res.status(409).json({ message: "Not found" })
-    }
+  const latest = await Admin.find();
+  if (latest) {
+    res.status(201).json(latest)
+  }
+  else {
+    res.status(409).json({ message: "Not found" })
+  }
 })
 
 app.get('/newArrivals', async (req, res) => {
@@ -45,11 +45,50 @@ app.get('/newArrivals', async (req, res) => {
   }
 });
 
+app.get('/bestSellers', async (req, res) => {
+  try {
+    let BestSellers = await Product.find({
+      BestSeller: true
+    }).sort({ createdAt: -1 })
+      .lean();
+    if (!BestSellers.length) {
+      return res.status(404).json({ message: 'No new arrivals found' });
+    }
+    return res.status(200).json(BestSellers);
+  } catch (error) {
+    console.error('Error fetching new arrivals:', error);
+    res.status(500).json({
+      message: 'Error fetching new arrivals',
+    });
+  }
+})
+
+app.get("/summerCollection", async (req, res) => {
+  try {
+    const products = await Product.find({ Category: "Summer" }).sort({ Price: 1 });
+    res.status(200).json(products);
+    
+  } catch (error) {
+    console.error("Error fetching summer collection:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.get("/winterCollection", async (req, res) => {
+  try {
+    const products = await Product.find({ Category: "Winter" }).sort({ Price: 1 });
+    res.status(200).json(products);
+  } catch (error) {
+    console.error("Error fetching winter collection:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 
 
 
 app.listen(5000, () => {
-    console.log("server is running");
+  console.log("server is running");
 
 })
 
