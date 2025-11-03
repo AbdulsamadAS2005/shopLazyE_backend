@@ -56,9 +56,9 @@ app.get('/bestSellers', async (req, res) => {
     }
     return res.status(200).json(BestSellers);
   } catch (error) {
-    console.error('Error fetching new arrivals:', error);
+    console.error('Error fetching best sellers:', error);
     res.status(500).json({
-      message: 'Error fetching new arrivals',
+      message: 'Error fetching best sellers',
     });
   }
 })
@@ -80,6 +80,16 @@ app.get("/winterCollection", async (req, res) => {
     res.status(200).json(products);
   } catch (error) {
     console.error("Error fetching winter collection:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+app.get("/allProducts", async (req, res) => {
+  try {
+    const products = await Product.find().sort({ createdAt: -1 });
+    res.status(200).json(products);
+  } catch (error) {
+    console.error("Error fetching all products:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
