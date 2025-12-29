@@ -382,6 +382,8 @@ app.put('/admin/update-order-status/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
     const { status } = req.body;
+    console.log(orderId,status);
+    
     
 
     if (!['pending', 'completed', 'cancelled'].includes(status)) {
