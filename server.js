@@ -75,7 +75,7 @@ app.get('/bestSellers', async (req, res) => {
 
 app.get("/summerCollection", async (req, res) => {
   try {
-    const products = await Product.find({ Category: "Summer" }).sort({ Price: 1 });
+    const products = await Product.find({ Category: "summer" }).sort({ Price: 1 });
     res.status(200).json(products);
 
   } catch (error) {
@@ -86,7 +86,7 @@ app.get("/summerCollection", async (req, res) => {
 
 app.get("/winterCollection", async (req, res) => {
   try {
-    const products = await Product.find({ Category: "Winter" }).sort({ Price: 1 });
+    const products = await Product.find({ Category: "winter" }).sort({ Price: 1 });
     res.status(200).json(products);
   } catch (error) {
     console.error("Error fetching winter collection:", error);
