@@ -1,87 +1,74 @@
-let express = require('express')
+// =======================
+// server.js (Vercel-ready)
+// =======================
+
+let express = require('express');
 let app = express();
-require('./mongoose')
-let cors = require('cors')
-app.use(cors())
-app.use(express.json())
+require('./mongoose');
+let cors = require('cors');
+app.use(cors());
+app.use(express.json());
 require("dotenv").config();
 
 const mongoose = require('mongoose');
 
-// Increase body size limit for file uploads
+// Increase body size limit
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+const Admin = require('./schemas/latest.js');
+const Product = require('./schemas/products.js');
+const Order = require('./schemas/orders.js');
 
+// =======================
+// Basic Routes
+// =======================
+app.get('/', (req, res) => res.send("running!!!"));
 
-const Admin = require('./schemas/latest.js')
-const Product = require('./schemas/products.js')
-const Order = require('./schemas/orders.js')
-
-app.get('/', (req, res) => {
-  res.send("running!!!")
-})
-
+// Latest
 app.get('/getLatest', async (req, res) => {
-  const latest = await Admin.find();
-  if (latest) {
-    res.status(201).json(latest)
+  try {
+    const latest = await Admin.find();
+    res.status(latest ? 201 : 409).json(latest || { message: "Not found" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
-  else {
-    res.status(409).json({ message: "Not found" })
-  }
-})
+});
 
+// New arrivals
 app.get('/newArrivals', async (req, res) => {
   try {
     const twoWeeksAgo = new Date();
     twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
 
-    const newArrivals = await Product.find({
-      createdAt: { $gte: twoWeeksAgo },
-    })
-      .sort({ createdAt: -1 })
-      .lean();
-
-    if (!newArrivals.length) {
-      return res.status(404).json({ message: 'No new arrivals found' });
-    }
-
-    return res.status(200).json(newArrivals);
+    const newArrivals = await Product.find({ createdAt: { $gte: twoWeeksAgo } }).sort({ createdAt: -1 }).lean();
+    res.status(newArrivals.length ? 200 : 404).json(newArrivals.length ? newArrivals : { message: 'No new arrivals found' });
   } catch (err) {
-    console.error('Error fetching new arrivals:', err);
-    res.status(500).json({
-      message: 'Error fetching new arrivals',
-    });
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
+// Best sellers
 app.get('/bestSellers', async (req, res) => {
   try {
-    let BestSellers = await Product.find({
-      BestSeller: true
-    }).sort({ createdAt: -1 })
-      .lean();
-    if (!BestSellers.length) {
-      return res.status(404).json({ message: 'No new arrivals found' });
-    }
-    return res.status(200).json(BestSellers);
-  } catch (error) {
-    console.error('Error fetching best sellers:', error);
-    res.status(500).json({
-      message: 'Error fetching best sellers',
-    });
+    const bestSellers = await Product.find({ BestSeller: true }).sort({ createdAt: -1 }).lean();
+    res.status(bestSellers.length ? 200 : 404).json(bestSellers.length ? bestSellers : { message: 'No best sellers found' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
-})
+});
 
+// Collections
 app.get("/summerCollection", async (req, res) => {
   try {
     const products = await Product.find({ Category: "summer" }).sort({ Price: 1 });
     res.status(200).json(products);
-
-  } catch (error) {
-    console.error("Error fetching summer collection:", error);
-    res.status(500).json({ message: "Internal server error" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -89,9 +76,9 @@ app.get("/winterCollection", async (req, res) => {
   try {
     const products = await Product.find({ Category: "winter" }).sort({ Price: 1 });
     res.status(200).json(products);
-  } catch (error) {
-    console.error("Error fetching winter collection:", error);
-    res.status(500).json({ message: "Internal server error" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -99,31 +86,26 @@ app.get("/allProducts", async (req, res) => {
   try {
     const products = await Product.find().sort({ createdAt: -1 });
     res.status(200).json(products);
-  } catch (error) {
-    console.error("Error fetching all products:", error);
-    res.status(500).json({ message: "Internal server error" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
 app.get('/singleProduct/:id', async (req, res) => {
   try {
-    const { id } = req.params;
-
-    const product = await Product.findById(id);
-
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
-
-    res.status(200).json(product);
-  } catch (error) {
-    console.error('Error fetching product:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    const product = await Product.findById(req.params.id);
+    res.status(product ? 200 : 404).json(product || { message: "Product not found" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
+// =======================
+// Microsoft Graph setup
+// =======================
 const { ClientSecretCredential } = require("@azure/identity");
-const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 const tenantId = process.env.TenantId;
 const clientId = process.env.ClientId;
@@ -144,65 +126,31 @@ try {
 }
 
 // =======================
-// Email sending functions
+// Email sending functions (Vercel safe)
 // =======================
-
 async function sendMailToCustomerAfterConfirmOrder(id) {
-  if (!credential) {
-    console.warn("⚠️ Email skipped — Azure not configured");
-    return;
-  }
+  if (!credential) return;
 
   let accessToken;
   try {
-    const tokenResponse = await credential.getToken("https://graph.microsoft.com/.default");
-    accessToken = tokenResponse.token;
+    accessToken = (await credential.getToken("https://graph.microsoft.com/.default")).token;
   } catch (err) {
-    console.error("❌ Failed to get Azure token for customer email:", err);
+    console.error("Azure token fetch failed (customer):", err);
     return;
   }
 
-  let order;
-  try {
-    order = await Order.findById(id);
-    if (!order) throw new Error("Order not found");
-  } catch (err) {
-    console.error("❌ Failed to fetch order for customer email:", err);
-    return;
-  }
+  const order = await Order.findById(id);
+  if (!order) return;
 
-  const productDetails = await Promise.all(
-    order.products.map(async p => {
-      try {
-        const prod = await Product.findById(p.productId);
-        return `${prod?.Name || "Unknown Product"} - Quantity: ${p.quantity}`;
-      } catch {
-        return `Unknown Product - Quantity: ${p.quantity}`;
-      }
-    })
-  );
-
-  const emailContent = `
-Hello,
-
-Thank you for your order! Your order has been successfully confirmed.
-
-Order Details:
-${productDetails.join("\n")}
-
-Total Price: ${order.Totalprice}
-Your Address: ${order.Address}
-
-We will notify you shortly. If you have any questions, feel free to reply to this email.
-
-Best regards,
-ShopLayze
-  `;
+  const productDetails = await Promise.all(order.products.map(async p => {
+    const prod = await Product.findById(p.productId);
+    return `${prod?.Name || "Unknown"} - Quantity: ${p.quantity}`;
+  }));
 
   const mail = {
     message: {
       subject: "Your Order Confirmation",
-      body: { contentType: "Text", content: emailContent },
+      body: { contentType: "Text", content: `Hello!\n\nOrder Details:\n${productDetails.join("\n")}\n\nTotal: ${order.Totalprice}\nAddress: ${order.Address}` },
       toRecipients: [{ emailAddress: { address: order.Email } }],
     },
   };
@@ -210,111 +158,53 @@ ShopLayze
   try {
     const res = await fetch(`https://graph.microsoft.com/v1.0/users/${userEmail}/sendMail`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
       body: JSON.stringify(mail),
     });
-
-    if (!res.ok) {
-      const errData = await res.json();
-      console.error("❌ Customer email failed:", errData);
-      return;
-    }
-
-    console.log("✅ Customer email sent successfully!");
+    if (!res.ok) console.error("Customer email send failed:", await res.json());
+    else console.log("✅ Customer email sent");
   } catch (err) {
-    console.error("❌ Customer email send error:", err);
+    console.error("Customer email error:", err);
   }
 }
 
 async function sendMailToOwnGmailAfterConfirmOrder(id) {
-  if (!credential) {
-    console.warn("⚠️ Admin email skipped — Azure not configured");
-    return;
-  }
+  if (!credential) return;
 
   let accessToken;
   try {
-    const tokenResponse = await credential.getToken("https://graph.microsoft.com/.default");
-    accessToken = tokenResponse.token;
+    accessToken = (await credential.getToken("https://graph.microsoft.com/.default")).token;
   } catch (err) {
-    console.error("❌ Failed to get Azure token for admin email:", err);
+    console.error("Azure token fetch failed (admin):", err);
     return;
   }
 
-  let order;
-  try {
-    order = await Order.findById(id);
-    if (!order) throw new Error("Order not found");
-  } catch (err) {
-    console.error("❌ Failed to fetch order for admin email:", err);
-    return;
-  }
+  const order = await Order.findById(id);
+  if (!order) return;
 
-  const productDetails = await Promise.all(
-    order.products.map(async p => {
-      try {
-        const prod = await Product.findById(p.productId);
-        return `${prod?.Name || "Unknown Product"} - Quantity: ${p.quantity}`;
-      } catch {
-        return `Unknown Product - Quantity: ${p.quantity}`;
-      }
-    })
-  );
-
-  const emailContent = `
-New Order Received - ShopLayze
-
-Customer Details:
-Name: ${order.Name}
-Email: ${order.Email}
-Phone: ${order.PhoneNumber}
-
-Order Items:
-${productDetails.join("\n")}
-
-Payment Method: ${order.PaymentMethod}
-Total Price: ${order.Totalprice}
-
-Shipping Address:
-${order.Address}
-
-Order Date: ${new Date(order.createdAt).toLocaleString()}
-
-— ShopLayze System
-  `;
+  const productDetails = await Promise.all(order.products.map(async p => {
+    const prod = await Product.findById(p.productId);
+    return `${prod?.Name || "Unknown"} - Quantity: ${p.quantity}`;
+  }));
 
   const mail = {
     message: {
       subject: "📦 New Order Received - ShopLayze",
-      body: { contentType: "Text", content: emailContent },
-      toRecipients: [
-        { emailAddress: { address: "iabdulsamad28@gmail.com" } } // Replace with your admin email
-      ],
+      body: { contentType: "Text", content: `New order!\nCustomer: ${order.Name}\nEmail: ${order.Email}\nPhone: ${order.PhoneNumber}\nItems:\n${productDetails.join("\n")}\nPayment: ${order.PaymentMethod}\nTotal: ${order.Totalprice}\nAddress: ${order.Address}` },
+      toRecipients: [{ emailAddress: { address: "iabdulsamad28@gmail.com" } }],
     },
   };
 
   try {
     const res = await fetch(`https://graph.microsoft.com/v1.0/users/${userEmail}/sendMail`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
       body: JSON.stringify(mail),
     });
-
-    if (!res.ok) {
-      const errData = await res.json();
-      console.error("❌ Admin email failed:", errData);
-      return;
-    }
-
-    console.log("✅ Admin email sent successfully!");
+    if (!res.ok) console.error("Admin email send failed:", await res.json());
+    else console.log("✅ Admin email sent");
   } catch (err) {
-    console.error("❌ Admin email send error:", err);
+    console.error("Admin email error:", err);
   }
 }
 
@@ -338,7 +228,7 @@ app.post('/newOrder', async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
-    // Fire emails asynchronously — do NOT block response
+    // Fire emails async
     sendMailToCustomerAfterConfirmOrder(savedOrder._id).catch(console.error);
     sendMailToOwnGmailAfterConfirmOrder(savedOrder._id).catch(console.error);
 
@@ -347,16 +237,11 @@ app.post('/newOrder', async (req, res) => {
       message: "Order created successfully",
       order: savedOrder,
     });
-  } catch (error) {
-    console.error("❌ /newOrder failed:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to create order",
-      error: error.message,
-    });
+  } catch (err) {
+    console.error("/newOrder failed:", err);
+    res.status(500).json({ success: false, message: "Failed to create order", error: err.message });
   }
 });
-
 
 app.get('/adminHomePage', async (req, res) => {
   try {
