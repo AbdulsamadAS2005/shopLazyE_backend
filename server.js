@@ -121,16 +121,152 @@ app.get('/singleProduct/:id', async (req, res) => {
   }
 });
 
-const SendMeassageAfterConfirmOrder = (email) => {
+const { ClientSecretCredential } = require("@azure/identity");
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
+// --- Azure app credentials ---
+const tenantId = process.env.TenantId;
+const clientId = process.env.ClientId;
+const clientSecret = process.env.ClientSecret;
+const userEmail = "ceo@shoplayze.com";
+
+const credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+
+// Function to send email via Microsoft Graph API
+async function sendMailToCustomerAfterConfirmOrder(id) {
+  const tokenResponse = await credential.getToken("https://graph.microsoft.com/.default");
+  const accessToken = tokenResponse.token;
+
+  let order = await Order.findById(id);
+  let customerEmail = order.Email;
+
+  // Fetch full product details from the Products collection
+  const productDetails = await Promise.all(
+    order.products.map(async p => {
+      const prod = await Product.findById(p.productId);
+      return `${prod.Name} - Quantity: ${p.quantity}`;
+    })
+  );
+
+  const emailContent = `
+Hello,
+
+Thank you for your order! Your order has been successfully confirmed.
+
+Order Details:
+${productDetails.join("\n")}
+
+Total Price: ${order.Totalprice}
+Your Address: ${order.Address}
+
+We will notify you shortly. If you have any questions, feel free to reply to this email.
+
+Best regards,
+ShopLayze
+  `;
+
+  const mail = {
+    message: {
+      subject: "Your Order Confirmation",
+      body: {
+        contentType: "Text",
+        content: emailContent,
+      },
+      toRecipients: [{ emailAddress: { address: customerEmail } }],
+    },
+  };
+
+  const res = await fetch(`https://graph.microsoft.com/v1.0/users/${userEmail}/sendMail`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(mail),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(JSON.stringify(err));
+  }
+
+  console.log("Email sent successfully!");
 }
+
+async function sendMailToOwnGmailAfterConfirmOrder(id) {
+  const tokenResponse = await credential.getToken("https://graph.microsoft.com/.default");
+  const accessToken = tokenResponse.token;
+
+  const order = await Order.findById(id);
+
+  // Fetch full product details
+  const productDetails = await Promise.all(
+    order.products.map(async p => {
+      const prod = await Product.findById(p.productId);
+      return `${prod?.Name || "Unknown Product"} - Quantity: ${p.quantity}`;
+    })
+  );
+
+  // Admin email content
+  const emailContent = `
+New Order Received - ShopLayze
+
+Customer Details:
+Name: ${order.Name}
+Email: ${order.Email}
+Phone: ${order.PhoneNumber}
+
+Order Items:
+${productDetails.join("\n")}
+
+Payment Method: ${order.PaymentMethod}
+Total Price: ${order.Totalprice}
+
+Shipping Address:
+${order.Address}
+
+Order Date: ${new Date(order.createdAt).toLocaleString()}
+
+— ShopLayze System
+  `;
+
+  const mail = {
+    message: {
+      subject: "📦 New Order Received - ShopLayze",
+      body: {
+        contentType: "Text",
+        content: emailContent,
+      },
+      toRecipients: [
+        { emailAddress: { address: "iabdulsamad28@gmail.com" } } // 👈 Replace with your Gmail
+      ],
+    },
+  };
+
+  const res = await fetch(`https://graph.microsoft.com/v1.0/users/${userEmail}/sendMail`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(mail),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(JSON.stringify(err));
+  }
+
+  console.log("Admin email sent successfully!");
+}
+
 
 app.post('/newOrder', async (req, res) => {
   try {
-    const {products,PaymentMethod,Name,Email,PhoneNumber,Address,Totalprice}=req.body;
-    console.log("new order=> ",products,PaymentMethod,Name,Email,PhoneNumber,Address,Totalprice);
-    
-        // Create new order
+    const { products, PaymentMethod, Name, Email, PhoneNumber, Address, Totalprice } = req.body;
+    console.log("new order=> ", products, PaymentMethod, Name, Email, PhoneNumber, Address, Totalprice);
+
+    // Create new order
     const newOrder = new Order({
       products,
       PaymentMethod,
@@ -141,20 +277,20 @@ app.post('/newOrder', async (req, res) => {
       Totalprice,
       Status: "pending" // optional default status
     });
-    console.log("new order::=> ",newOrder);
-    
+    console.log("new order::=> ", newOrder);
     // Save to MongoDB
     const savedOrder = await newOrder.save();
-
+    await sendMailToCustomerAfterConfirmOrder(savedOrder._id);
+    await sendMailToOwnGmailAfterConfirmOrder(savedOrder._id);
     res.status(201).json({
       success: true,
       message: "Order created successfully",
       order: savedOrder
     });
-    
+
   } catch (error) {
-   console.log(error);
-    
+    console.log(error);
+
   }
 });
 
@@ -281,10 +417,10 @@ app.post('/admin/add-product', upload.single('Image'), async (req, res) => {
 app.get('/admin/orders', async (req, res) => {
   try {
     const orders = await Order.find().sort({ createdAt: -1 });
-    
+
     console.log('\n=== DEBUG: Fetching Orders ===');
     console.log(`Total orders found: ${orders.length}`);
-    
+
     // Fetch product details for all product IDs in all orders
     const ordersWithProductDetails = await Promise.all(
       orders.map(async (order, orderIndex) => {
@@ -292,22 +428,22 @@ app.get('/admin/orders', async (req, res) => {
         console.log(`Order ID: ${order._id}`);
         console.log(`Customer: ${order.Name}`);
         console.log(`Total Price: ${order.Totalprice}`);
-        
+
         const orderObj = order.toObject();
-        
+
         if (orderObj.products && orderObj.products.length > 0) {
           console.log(`Products in order: ${orderObj.products.length}`);
-          
+
           // For each product in the order, fetch its details
           const productsWithDetails = await Promise.all(
             orderObj.products.map(async (item, productIndex) => {
               console.log(`\n  Product ${productIndex + 1}:`);
               console.log(`    Quantity: ${item.quantity}`);
-              
+
               // Check for product ID - it might be in _id or productID field
               const productId = item.productId;
               console.log(`    Looking for product with ID: "${productId}"`);
-              
+
               try {
                 if (productId) {
                   // Check if it's a valid ObjectId
@@ -315,7 +451,7 @@ app.get('/admin/orders', async (req, res) => {
                     console.log(`    ERROR: Invalid ObjectId format: "${productId}"`);
                   } else {
                     const product = await Product.findById(productId);
-                    
+
                     if (product) {
                       console.log(`    ✅ Found product: "${product.Name}"`);
                       console.log(`    Price: ${product.Price}`);
@@ -330,11 +466,11 @@ app.get('/admin/orders', async (req, res) => {
                       };
                     } else {
                       console.log(`    ❌ Product not found in database`);
-                      
+
                       // Let's check if any products exist at all
                       const totalProducts = await Product.countDocuments();
                       console.log(`    Total products in database: ${totalProducts}`);
-                      
+
                       // Get first few products to see their IDs
                       const sampleProducts = await Product.find().limit(3);
                       console.log(`    Sample product IDs: ${sampleProducts.map(p => p._id.toString())}`);
@@ -346,7 +482,7 @@ app.get('/admin/orders', async (req, res) => {
               } catch (error) {
                 console.error(`    ❌ Error fetching product:`, error.message);
               }
-              
+
               // Return default values if product not found
               console.log(`    ⚠️ Returning "Product Not Found"`);
               return {
@@ -359,16 +495,16 @@ app.get('/admin/orders', async (req, res) => {
               };
             })
           );
-          
+
           orderObj.products = productsWithDetails;
         } else {
           console.log('No products in this order');
         }
-        
+
         return orderObj;
       })
     );
-    
+
     console.log('\n=== DEBUG: Sending Response ===');
     res.status(200).json(ordersWithProductDetails);
   } catch (error) {
@@ -382,9 +518,9 @@ app.put('/admin/update-order-status/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
     const { status } = req.body;
-    console.log(orderId,status);
-    
-    
+    console.log(orderId, status);
+
+
 
     if (!['pending', 'completed', 'cancelled'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
@@ -416,21 +552,21 @@ app.get('/admin/orders/status/:status', async (req, res) => {
   try {
     const { status } = req.params;
     const orders = await Order.find({ Status: status }).sort({ createdAt: -1 });
-    
+
     // Populate product details for each order
     const ordersWithProductDetails = await Promise.all(
       orders.map(async (order) => {
         const orderObj = order.toObject();
-        
+
         if (orderObj.products && orderObj.products.length > 0) {
           const productsWithDetails = await Promise.all(
             orderObj.products.map(async (item) => {
               try {
                 // Check for product ID - it might be in _id or productID field
                 const productId = item.productId;
-                
+
                 const product = await Product.findById(productId);
-                
+
                 if (product) {
                   return {
                     Name: product.Name || 'Product',
@@ -444,7 +580,7 @@ app.get('/admin/orders/status/:status', async (req, res) => {
               } catch (error) {
                 console.error('Error fetching product:', error);
               }
-              
+
               return {
                 Name: 'Product Not Found',
                 ImageUrl: 'https://via.placeholder.com/150',
@@ -454,14 +590,14 @@ app.get('/admin/orders/status/:status', async (req, res) => {
               };
             })
           );
-          
+
           orderObj.products = productsWithDetails;
         }
-        
+
         return orderObj;
       })
     );
-    
+
     res.status(200).json(ordersWithProductDetails);
   } catch (error) {
     console.error('Error fetching orders by status:', error);
@@ -470,9 +606,7 @@ app.get('/admin/orders/status/:status', async (req, res) => {
 });
 
 
+// Start server
 app.listen(5000, () => {
-  console.log("server is running");
-
-})
-
-module.exports = app;
+  console.log("Server running on port 5000");
+});
