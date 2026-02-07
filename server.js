@@ -135,21 +135,29 @@ let credential = null;
 try {
   if (tenantId && clientId && clientSecret) {
     credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+    console.log("✅ Azure email enabled");
   } else {
     console.warn("⚠️ Azure ENV missing — email disabled");
   }
 } catch (err) {
-  console.error("Azure init failed:", err.message);
+  console.error("❌ Azure init failed:", err.message);
 }
-
 
 // Function to send email via Microsoft Graph API
 async function sendMailToCustomerAfterConfirmOrder(id) {
+
+  if (!credential) {
+    console.warn("⚠️ Email skipped — Azure not configured");
+    return;
+  }
+
   const tokenResponse = await credential.getToken("https://graph.microsoft.com/.default");
   const accessToken = tokenResponse.token;
 
   let order = await Order.findById(id);
   let customerEmail = order.Email;
+
+
 
   // Fetch full product details from the Products collection
   const productDetails = await Promise.all(
@@ -205,6 +213,11 @@ ShopLayze
 }
 
 async function sendMailToOwnGmailAfterConfirmOrder(id) {
+
+  if (!credential) {
+    console.warn("⚠️ Email skipped — Azure not configured");
+    return;
+  }
   const tokenResponse = await credential.getToken("https://graph.microsoft.com/.default");
   const accessToken = tokenResponse.token;
 
