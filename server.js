@@ -105,108 +105,108 @@ app.get('/singleProduct/:id', async (req, res) => {
 // =======================
 // Microsoft Graph setup
 // =======================
-// const { ClientSecretCredential } = require("@azure/identity");
+const { ClientSecretCredential } = require("@azure/identity");
 
-// const tenantId = process.env.TenantId;
-// const clientId = process.env.ClientId;
-// const clientSecret = process.env.ClientSecret;
-// const userEmail = "ceo@shoplayze.com";
+const tenantId = process.env.TenantId;
+const clientId = process.env.ClientId;
+const clientSecret = process.env.ClientSecret;
+const userEmail = "ceo@shoplayze.com";
 
-// let credential = null;
+let credential = null;
 
-// try {
-//   if (tenantId && clientId && clientSecret) {
-//     credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
-//     console.log("✅ Azure email enabled");
-//   } else {
-//     console.warn("⚠️ Azure ENV missing — email disabled");
-//   }
-// } catch (err) {
-//   console.error("❌ Azure init failed:", err.message);
-// }
+try {
+  if (tenantId && clientId && clientSecret) {
+    credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+    console.log("✅ Azure email enabled");
+  } else {
+    console.warn("⚠️ Azure ENV missing — email disabled");
+  }
+} catch (err) {
+  console.error("❌ Azure init failed:", err.message);
+}
 
 // =======================
 // Email sending functions (Vercel safe)
 // =======================
-// async function sendMailToCustomerAfterConfirmOrder(id) {
-//   if (!credential) return;
+async function sendMailToCustomerAfterConfirmOrder(id) {
+  if (!credential) return;
 
-//   let accessToken;
-//   try {
-//     accessToken = (await credential.getToken("https://graph.microsoft.com/.default")).token;
-//   } catch (err) {
-//     console.error("Azure token fetch failed (customer):", err);
-//     return;
-//   }
+  let accessToken;
+  try {
+    accessToken = (await credential.getToken("https://graph.microsoft.com/.default")).token;
+  } catch (err) {
+    console.error("Azure token fetch failed (customer):", err);
+    return;
+  }
 
-//   const order = await Order.findById(id);
-//   if (!order) return;
+  const order = await Order.findById(id);
+  if (!order) return;
 
-//   const productDetails = await Promise.all(order.products.map(async p => {
-//     const prod = await Product.findById(p.productId);
-//     return `${prod?.Name || "Unknown"} - Quantity: ${p.quantity}`;
-//   }));
+  const productDetails = await Promise.all(order.products.map(async p => {
+    const prod = await Product.findById(p.productId);
+    return `${prod?.Name || "Unknown"} - Quantity: ${p.quantity}`;
+  }));
 
-//   const mail = {
-//     message: {
-//       subject: "Your Order Confirmation",
-//       body: { contentType: "Text", content: `Hello!\n\nOrder Details:\n${productDetails.join("\n")}\n\nTotal: ${order.Totalprice}\nAddress: ${order.Address}` },
-//       toRecipients: [{ emailAddress: { address: order.Email } }],
-//     },
-//   };
+  const mail = {
+    message: {
+      subject: "Your Order Confirmation",
+      body: { contentType: "Text", content: `Hello!\n\nOrder Details:\n${productDetails.join("\n")}\n\nTotal: ${order.Totalprice}\nAddress: ${order.Address}` },
+      toRecipients: [{ emailAddress: { address: order.Email } }],
+    },
+  };
 
-//   try {
-//     const res = await fetch(`https://graph.microsoft.com/v1.0/users/${userEmail}/sendMail`, {
-//       method: "POST",
-//       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-//       body: JSON.stringify(mail),
-//     });
-//     if (!res.ok) console.error("Customer email send failed:", await res.json());
-//     else console.log("✅ Customer email sent");
-//   } catch (err) {
-//     console.error("Customer email error:", err);
-//   }
-// }
+  try {
+    const res = await fetch(`https://graph.microsoft.com/v1.0/users/${userEmail}/sendMail`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(mail),
+    });
+    if (!res.ok) console.error("Customer email send failed:", await res.json());
+    else console.log("✅ Customer email sent");
+  } catch (err) {
+    console.error("Customer email error:", err);
+  }
+}
 
-// async function sendMailToOwnGmailAfterConfirmOrder(id) {
-//   if (!credential) return;
+async function sendMailToOwnGmailAfterConfirmOrder(id) {
+  if (!credential) return;
 
-//   let accessToken;
-//   try {
-//     accessToken = (await credential.getToken("https://graph.microsoft.com/.default")).token;
-//   } catch (err) {
-//     console.error("Azure token fetch failed (admin):", err);
-//     return;
-//   }
+  let accessToken;
+  try {
+    accessToken = (await credential.getToken("https://graph.microsoft.com/.default")).token;
+  } catch (err) {
+    console.error("Azure token fetch failed (admin):", err);
+    return;
+  }
 
-//   const order = await Order.findById(id);
-//   if (!order) return;
+  const order = await Order.findById(id);
+  if (!order) return;
 
-//   const productDetails = await Promise.all(order.products.map(async p => {
-//     const prod = await Product.findById(p.productId);
-//     return `${prod?.Name || "Unknown"} - Quantity: ${p.quantity}`;
-//   }));
+  const productDetails = await Promise.all(order.products.map(async p => {
+    const prod = await Product.findById(p.productId);
+    return `${prod?.Name || "Unknown"} - Quantity: ${p.quantity}`;
+  }));
 
-//   const mail = {
-//     message: {
-//       subject: "📦 New Order Received - ShopLayze",
-//       body: { contentType: "Text", content: `New order!\nCustomer: ${order.Name}\nEmail: ${order.Email}\nPhone: ${order.PhoneNumber}\nItems:\n${productDetails.join("\n")}\nPayment: ${order.PaymentMethod}\nTotal: ${order.Totalprice}\nAddress: ${order.Address}` },
-//       toRecipients: [{ emailAddress: { address: "iabdulsamad28@gmail.com" } }],
-//     },
-//   };
+  const mail = {
+    message: {
+      subject: "📦 New Order Received - ShopLayze",
+      body: { contentType: "Text", content: `New order!\nCustomer: ${order.Name}\nEmail: ${order.Email}\nPhone: ${order.PhoneNumber}\nItems:\n${productDetails.join("\n")}\nPayment: ${order.PaymentMethod}\nTotal: ${order.Totalprice}\nAddress: ${order.Address}` },
+      toRecipients: [{ emailAddress: { address: "iabdulsamad28@gmail.com" } }],
+    },
+  };
 
-//   try {
-//     const res = await fetch(`https://graph.microsoft.com/v1.0/users/${userEmail}/sendMail`, {
-//       method: "POST",
-//       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-//       body: JSON.stringify(mail),
-//     });
-//     if (!res.ok) console.error("Admin email send failed:", await res.json());
-//     else console.log("✅ Admin email sent");
-//   } catch (err) {
-//     console.error("Admin email error:", err);
-//   }
-// }
+  try {
+    const res = await fetch(`https://graph.microsoft.com/v1.0/users/${userEmail}/sendMail`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(mail),
+    });
+    if (!res.ok) console.error("Admin email send failed:", await res.json());
+    else console.log("✅ Admin email sent");
+  } catch (err) {
+    console.error("Admin email error:", err);
+  }
+}
 
 // =======================
 // Fixed /newOrder route
