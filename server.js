@@ -9,6 +9,7 @@ let cors = require('cors');
 app.use(cors());
 app.use(express.json());
 require("dotenv").config();
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 const mongoose = require('mongoose');
 
@@ -129,87 +130,100 @@ async function getCredential() {
 // =======================
 // Email sending functions (SAFE)
 // =======================
-async function sendMailToCustomerAfterConfirmOrder(id) {
+
+async function sendMail(mail) {
   try {
     const credential = await getCredential();
-    if (!credential) return;
+    if (!credential) {
+      console.warn("Azure ENV missing — email skipped");
+      return;
+    }
 
     const token = await credential.getToken("https://graph.microsoft.com/.default");
 
+    const response = await fetch(
+      `https://graph.microsoft.com/v1.0/users/${userEmail}/sendMail`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token.token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(mail)
+      }
+    );
+
+    if (!response.ok) {
+      console.error("Graph email failed:", await response.text());
+    } else {
+      console.log("Email sent successfully");
+    }
+
+  } catch (err) {
+    console.error("Email error:", err.message);
+  }
+}
+
+
+async function sendMailToCustomerAfterConfirmOrder(id) {
+  try {
     const order = await Order.findById(id);
     if (!order) return;
 
-    const productDetails = await Promise.all(order.products.map(async p => {
-      const prod = await Product.findById(p.productId);
-      return `${prod?.Name || "Unknown"} - Quantity: ${p.quantity}`;
-    }));
+    const productDetails = await Promise.all(
+      order.products.map(async p => {
+        const prod = await Product.findById(p.productId);
+        return `${prod?.Name || "Unknown"} x${p.quantity}`;
+      })
+    );
 
     const mail = {
       message: {
         subject: "Your Order Confirmation",
         body: {
           contentType: "Text",
-          content: `Hello!\n\nOrder Details:\n${productDetails.join("\n")}\n\nTotal: ${order.Totalprice}\nAddress: ${order.Address}`
+          content: `Hello!\n\nOrder:\n${productDetails.join("\n")}\n\nTotal: ${order.Totalprice}\nAddress: ${order.Address}`
         },
         toRecipients: [{ emailAddress: { address: order.Email } }]
       }
     };
 
-    await fetch(`https://graph.microsoft.com/v1.0/users/${userEmail}/sendMail`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token.token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(mail)
-    });
-
-    console.log("✅ Customer email sent");
+    await sendMail(mail);
   } catch (err) {
-    console.error("Customer email error:", err.message);
+    console.error("Customer email failed:", err.message);
   }
 }
 
+
 async function sendMailToOwnGmailAfterConfirmOrder(id) {
   try {
-    const credential = await getCredential();
-    if (!credential) return;
-
-    const token = await credential.getToken("https://graph.microsoft.com/.default");
-
     const order = await Order.findById(id);
     if (!order) return;
 
-    const productDetails = await Promise.all(order.products.map(async p => {
-      const prod = await Product.findById(p.productId);
-      return `${prod?.Name || "Unknown"} - Quantity: ${p.quantity}`;
-    }));
+    const productDetails = await Promise.all(
+      order.products.map(async p => {
+        const prod = await Product.findById(p.productId);
+        return `${prod?.Name || "Unknown"} x${p.quantity}`;
+      })
+    );
 
     const mail = {
       message: {
         subject: "📦 New Order Received - ShopLayze",
         body: {
           contentType: "Text",
-          content: `New order!\nCustomer: ${order.Name}\nEmail: ${order.Email}\nPhone: ${order.PhoneNumber}\nItems:\n${productDetails.join("\n")}\nPayment: ${order.PaymentMethod}\nTotal: ${order.Totalprice}\nAddress: ${order.Address}`
+          content: `Customer: ${order.Name}\nEmail: ${order.Email}\nPhone: ${order.PhoneNumber}\n\nItems:\n${productDetails.join("\n")}\n\nTotal: ${order.Totalprice}\nAddress: ${order.Address}`
         },
         toRecipients: [{ emailAddress: { address: "iabdulsamad28@gmail.com" } }]
       }
     };
 
-    await fetch(`https://graph.microsoft.com/v1.0/users/${userEmail}/sendMail`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token.token}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(mail)
-    });
-
-    console.log("✅ Admin email sent");
+    await sendMail(mail);
   } catch (err) {
-    console.error("Admin email error:", err.message);
+    console.error("Admin email failed:", err.message);
   }
 }
+
 
 
 // =======================
@@ -232,11 +246,9 @@ app.post('/newOrder', async (req, res) => {
 
     const savedOrder = await newOrder.save();
 
-    // SAFE async background emails
-    setTimeout(() => {
-      sendMailToCustomerAfterConfirmOrder(savedOrder._id);
-      sendMailToOwnGmailAfterConfirmOrder(savedOrder._id);
-    }, 0);
+    await sendMailToCustomerAfterConfirmOrder(savedOrder._id);
+    await sendMailToOwnGmailAfterConfirmOrder(savedOrder._id);
+
 
     res.status(201).json({
       success: true,
