@@ -107,9 +107,9 @@ app.get('/singleProduct/:id', async (req, res) => {
 // =======================
 const { ClientSecretCredential } = require("@azure/identity");
 
-const tenantId = process.env.TenantId;
-const clientId = process.env.ClientId;
-const clientSecret = process.env.ClientSecret;
+const tenantId = process.env.TenantId || "";
+const clientId = process.env.ClientId || "";
+const clientSecret = process.env.ClientSecret || "";
 const userEmail = "ceo@shoplayze.com";
 
 let credential = null;
