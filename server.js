@@ -9,6 +9,7 @@ let cors = require('cors');
 app.use(cors());
 app.use(express.json());
 require("dotenv").config();
+const fetch = require('node-fetch');
 
 const mongoose = require('mongoose');
 
@@ -107,9 +108,9 @@ app.get('/singleProduct/:id', async (req, res) => {
 // =======================
 const { ClientSecretCredential } = require("@azure/identity");
 
-const tenantId = process.env.TenantId || "";
-const clientId = process.env.ClientId || "";
-const clientSecret = process.env.ClientSecret || "";
+const tenantId = process.env.TenantId;
+const clientId = process.env.ClientId;
+const clientSecret = process.env.ClientSecret;
 const userEmail = "ceo@shoplayze.com";
 
 let credential = null;
@@ -229,8 +230,8 @@ app.post('/newOrder', async (req, res) => {
     const savedOrder = await newOrder.save();
 
     // Fire emails async
-    // sendMailToCustomerAfterConfirmOrder(savedOrder._id).catch(console.error);
-    // sendMailToOwnGmailAfterConfirmOrder(savedOrder._id).catch(console.error);
+    sendMailToCustomerAfterConfirmOrder(savedOrder._id).catch(console.error);
+    sendMailToOwnGmailAfterConfirmOrder(savedOrder._id).catch(console.error);
 
     res.status(201).json({
       success: true,
