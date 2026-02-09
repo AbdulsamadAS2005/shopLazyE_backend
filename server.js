@@ -39,9 +39,14 @@ app.get('/getLatest', async (req, res) => {
 
 app.post('/setLatest', async (req, res) => {
   try {
-    const latest = req.body.latest;
+    const { latest } = req.body; // frontend sends "latest"
 
-    await Admin.updateOne({}, { $set: { latest } });
+    const updated = await Admin.updateOne(
+      {},                  // update the first document
+      { $set: { Latest: latest } },  // match schema field
+    );
+
+    console.log("Updated latest:", latest, updated);
 
     res.status(200).json({ message: "Latest updated successfully" });
   } catch (err) {
@@ -49,6 +54,7 @@ app.post('/setLatest', async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
 
 
 // New arrivals
@@ -586,5 +592,10 @@ app.get('/admin/orders/status/:status', async (req, res) => {
   }
 });
 
+
+app.listen(5000,()=>{
+  console.log("running");
+  
+})
 
 module.exports = app;
