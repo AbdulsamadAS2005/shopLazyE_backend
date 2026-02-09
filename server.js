@@ -37,6 +37,20 @@ app.get('/getLatest', async (req, res) => {
   }
 });
 
+app.post('/setLatest', async (req, res) => {
+  try {
+    const latest = req.body.latest;
+
+    await Admin.updateOne({}, { $set: { latest } });
+
+    res.status(200).json({ message: "Latest updated successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
 // New arrivals
 app.get('/newArrivals', async (req, res) => {
   try {
